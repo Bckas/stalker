@@ -14,7 +14,7 @@ const {
   macServerurl, macGetGenres, macGetallChannels, macGetProfile, macForceUpdateChannels,
   getChannels, getChannelDetail, macFetchChannelsFromPortal, readCachedGenres, fixlogoissue,
 } = require('../lib/stalker');
-const { isAuthed, sessionCookie, clearCookie, createSessionToken } = require('../lib/auth');
+const { isAuthed, sessionCookie, clearCookie, createSessionToken, getCookie, verifySessionToken, COOKIE_NAME } = require('../lib/auth');
 const { buildFlatM3U, buildApiCategorizedM3U, buildCategorizedM3U } = require('../lib/m3u');
 const { handleLive } = require('../lib/live');
 
@@ -27,9 +27,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use((req, res, next) => { setRequestContext(req); next(); });
 
-// ================================================================
-// API handler (api.php ka port)
-// ================================================================
 async function handleApi(req, res) {
   const b = req.body || {};
   const q = req.query || {};
@@ -137,8 +134,9 @@ async function handleApi(req, res) {
         if (!pin) { response(res, 'error', 400, 'Please Enter Access PIN To Login', ''); break; }
         const irlPIN = await appAccesspin('get', '');
         if (md5(pin) === md5(irlPIN)) {
-          res.setHeader('Set-Cookie', sessionCookie(createSessionToken()));
-          response(res, 'success', 200, 'Logged In Successfully', '');
+          const token = createSessionToken();
+          res.setHeader('Set-Cookie', sessionCookie(token));
+          response(res, 'success', 200, 'Logged In Successfully', token);
         } else {
           response(res, 'error', 403, 'Invalid Credentials', '');
         }
@@ -308,10 +306,9 @@ async function handleApi(req, res) {
 }
 
 // ================================================================
-// Pages (PHP pages ka port)
+// Pages
 // ================================================================
 
-// GET / — Homepage (index.php)
 app.get('/', async (req, res) => {
   try {
     const mac = await appMacportaldetail('get');
@@ -339,26 +336,45 @@ app.get('/', async (req, res) => {
   }
 });
 
-// GET /login — login.php
+// GET /login — login page
 app.get('/login', (req, res) => {
   if (isAuthed(req)) { res.redirect('/admin'); return; }
   res.render('login', { appName: APP_CONFIG.APP_NAME });
 });
 
-// GET /admin — admin.php (auth required)
-app.get('/admin', (req, res) => {
-  if (!isAuthed(req)) { res.redirect('/login'); return; }
-  res.render('admin', { appName: APP_CONFIG.APP_NAME });
+// POST /login — native form login (JS/CDN fail hone par bhi kaam karega)
+app.post('/login', async (req, res) => {
+  const b = req.body || {};
+  const pin = String(b.pin || '').trim();
+  const irlPIN = await appAccesspin('get', '');
+  if (pin && md5(pin) === md5(irlPIN)) {
+    res.setHeader('Set-Cookie', sessionCookie(createSessionToken()));
+    res.redirect('/admin');
+  } else {
+    res.render('login', { appName: APP_CONFIG.APP_NAME, error: 'Invalid Access PIN. Please try again.' });
+  }
 });
 
-// GET /admin/logs — admin.php?module=application_logs
+// GET /admin — cookie YA query-token dono se khulega
+app.get('/admin', (req, res) => {
+  const token = getCookie(req, COOKIE_NAME) || (typeof req.query.token === 'string' ? req.query.token : '');
+  if (verifySessionToken(token)) {
+    if (req.query.token && !getCookie(req, COOKIE_NAME)) {
+      res.setHeader('Set-Cookie', sessionCookie(token));
+    }
+    res.render('admin', { appName: APP_CONFIG.APP_NAME });
+  } else {
+    res.redirect('/login');
+  }
+});
+
 app.get('/admin/logs', async (req, res) => {
-  if (!isAuthed(req)) { res.redirect('/login'); return; }
+  const token = getCookie(req, COOKIE_NAME) || (typeof req.query.token === 'string' ? req.query.token : '');
+  if (!verifySessionToken(token)) { res.redirect('/login'); return; }
   const logs = await store.readLog('axLogs');
   res.render('logs', { appName: APP_CONFIG.APP_NAME, logs });
 });
 
-// GET /player?id=X — player.php
 app.get('/player', async (req, res) => {
   try {
     const id = String(req.query.id || '').trim();
@@ -376,10 +392,8 @@ app.get('/player', async (req, res) => {
   }
 });
 
-// GET /live... — live.php (proxy)
 app.all(['/live', '/live.php', '/live.m3u8', '/live.ts', '/live.key'], handleLive);
 
-// GET /playlist.m3u — playlist.php
 app.get(['/playlist.m3u', '/playlist', '/playlist.php'], async (req, res) => {
   try {
     const data = await buildCategorizedM3U(req);
@@ -404,10 +418,8 @@ app.get(['/playlist.m3u', '/playlist', '/playlist.php'], async (req, res) => {
   }
 });
 
-// POST/GET /api — api.php
 app.all(['/api', '/api.php'], handleApi);
 
-// GET /check_data — debug
 app.get('/check_data', async (req, res) => {
   const channelsRaw = await store.get('axCTV');
   const genresRaw = await store.get('axGenres');
@@ -429,14 +441,23 @@ app.get('/check_data', async (req, res) => {
   });
 });
 
-// Legacy .php redirects (local dev ke liye; Vercel par rewrites already handle karte hain)
+// Debug helper
+app.get('/debug', async (req, res) => {
+  res.json({
+    storage: store.isPersistent ? 'vercel-kv' : 'in-memory',
+    session_secret_set: !!process.env.SESSION_SECRET,
+    cookie_header: req.headers.cookie || '(none)',
+    authed_by_cookie: isAuthed(req),
+  });
+});
+
+// Legacy .php redirects
 app.get('/index.php', (req, res) => res.redirect('/'));
 app.get('/admin.php', (req, res) => res.redirect('/admin'));
 app.get('/login.php', (req, res) => res.redirect('/login'));
 app.get('/player.php', (req, res) => res.redirect('/player?' + new URLSearchParams(req.query).toString()));
 app.get('/playlist.php', (req, res) => res.redirect('/playlist.m3u' + (req.query.view === 'browser' ? '?view=browser' : '')));
 
-// 404
 app.use((req, res) => {
   res.status(404).send('Not Found');
 });
