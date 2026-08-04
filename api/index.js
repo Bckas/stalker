@@ -32,12 +32,14 @@ async function handleApi(req, res) {
   const q = req.query || {};
   const get = (k) => (b[k] !== undefined && b[k] !== null ? b[k] : q[k]);
   const action = String(get('action') || '').trim();
+  const authToken = typeof get('token') === 'string' ? get('token') : '';
 
   const publicActions = [
     'getChannels', 'get_iptvplaylist', 'get_iptvplaylist_categorized',
     'get_genres', 'get_categories', 'login', 'logout', 'getPlaybackDetails',
   ];
-  if (!publicActions.includes(action) && !isAuthed(req)) {
+  // Cookie YA token se auth
+  if (!publicActions.includes(action) && !isAuthed(req) && !verifySessionToken(authToken)) {
     response(res, 'error', 401, 'Unauthorized Access. Please login.', '');
     return;
   }
@@ -336,33 +338,35 @@ app.get('/', async (req, res) => {
   }
 });
 
-// GET /login — login page
+// GET /login
 app.get('/login', (req, res) => {
   if (isAuthed(req)) { res.redirect('/admin'); return; }
   res.render('login', { appName: APP_CONFIG.APP_NAME });
 });
 
-// POST /login — native form login (JS/CDN fail hone par bhi kaam karega)
+// POST /login — server-side login (no JS needed). Cookie set + redirect.
 app.post('/login', async (req, res) => {
   const b = req.body || {};
   const pin = String(b.pin || '').trim();
   const irlPIN = await appAccesspin('get', '');
   if (pin && md5(pin) === md5(irlPIN)) {
-    res.setHeader('Set-Cookie', sessionCookie(createSessionToken()));
-    res.redirect('/admin');
+    const token = createSessionToken();
+    res.setHeader('Set-Cookie', sessionCookie(token));
+    // Redirect with token bhi — taaki cookie fail hone par bhi admin khule
+    res.redirect('/admin?token=' + encodeURIComponent(token));
   } else {
     res.render('login', { appName: APP_CONFIG.APP_NAME, error: 'Invalid Access PIN. Please try again.' });
   }
 });
 
-// GET /admin — cookie YA query-token dono se khulega
+// GET /admin — cookie YA query-token
 app.get('/admin', (req, res) => {
   const token = getCookie(req, COOKIE_NAME) || (typeof req.query.token === 'string' ? req.query.token : '');
   if (verifySessionToken(token)) {
     if (req.query.token && !getCookie(req, COOKIE_NAME)) {
       res.setHeader('Set-Cookie', sessionCookie(token));
     }
-    res.render('admin', { appName: APP_CONFIG.APP_NAME });
+    res.render('admin', { appName: APP_CONFIG.APP_NAME, token: typeof req.query.token === 'string' ? req.query.token : '' });
   } else {
     res.redirect('/login');
   }
@@ -441,14 +445,22 @@ app.get('/check_data', async (req, res) => {
   });
 });
 
-// Debug helper
+// Debug page (HTML)
 app.get('/debug', async (req, res) => {
-  res.json({
+  const cookie = req.headers.cookie || '(none)';
+  const tokenQ = typeof req.query.token === 'string' ? req.query.token : '';
+  const info = {
     storage: store.isPersistent ? 'vercel-kv' : 'in-memory',
     session_secret_set: !!process.env.SESSION_SECRET,
-    cookie_header: req.headers.cookie || '(none)',
+    cookie_header: cookie,
     authed_by_cookie: isAuthed(req),
-  });
+    token_present_in_url: !!tokenQ,
+    authed_by_token: verifySessionToken(tokenQ),
+  };
+  res.type('html').send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Debug</title>
+<style>body{background:#0f172a;color:#e2e8f0;font-family:monospace;padding:2rem}pre{background:#1e293b;padding:1rem;border-radius:8px;overflow:auto}</style></head>
+<body><h2>Debug Info</h2><pre>${JSON.stringify(info, null, 2)}</pre>
+<p>Test: <code>/debug?token=YOUR_TOKEN</code></p></body></html>`);
 });
 
 // Legacy .php redirects
