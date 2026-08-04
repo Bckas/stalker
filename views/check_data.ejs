@@ -1,0 +1,34 @@
+<!-- views/check_data.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Data</title>
+</head>
+<body>
+<h2>axCTV.enc Structure</h2>
+<pre>
+Total Channels: <%= channels.length %>
+
+First 5 Channels Structure:
+<%- JSON.stringify(channels.slice(0, 5), null, 2) %>
+</pre>
+
+<h2>axGenres.enc Structure</h2>
+<pre>
+Total Genres: <%= Object.keys(genres).length %>
+
+<%- JSON.stringify(genres, null, 2) %>
+</pre>
+
+<h2>Direct API Response Sample</h2>
+<% if (serverUrl) { %>
+<pre>
+<%- JSON.stringify(sample, null, 2) %>
+</pre>
+<% } else { %>
+<pre>Application is not configured yet.</pre>
+<% } %>
+</body>
+</html>
