@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+    window.APP_TOKEN = <%= JSON.stringify(typeof token !== 'undefined' ? token : '') %>;
+    if (location.search) history.replaceState({}, '', '/admin');
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel | <%= appName %></title>
