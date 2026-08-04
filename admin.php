@@ -4,32 +4,40 @@ if(!isset($_SESSION['yuvisession']) || $_SESSION['yuvisession'] !== true) {
     header("Location: login.php");
     exit();
 }
-include("_inc.configs.php");
-$pageTitle = "Admin Panel";
-$module = ""; if(isset($_GET['module'])){ $module = trim($_GET['module']); }
-if($module == "application_logs")
-{
-    $apps_logs = "";
-    if(file_exists($APP_CONFIG['DATA_FOLDER']."/axLogs.enc")) { $apps_logs = @file_get_contents($APP_CONFIG['DATA_FOLDER']."/axLogs.enc"); }
-?>
-<html>
 
+include_once("_inc.configs.php");
+
+// Fallback function if not defined in config
+if (!function_exists('generateRandomAlphanumericString')) {
+    function generateRandomAlphanumericString($length = 32) {
+        return bin2hex(random_bytes($length / 2));
+    }
+}
+
+$pageTitle = "Admin Panel";
+$module = isset($_GET['module']) ? trim($_GET['module']) : '';
+
+if($module === "application_logs") {
+    $apps_logs = "";
+    if(file_exists($APP_CONFIG['DATA_FOLDER']."/axLogs.enc")) { 
+        $apps_logs = @file_get_contents($APP_CONFIG['DATA_FOLDER']."/axLogs.enc"); 
+    }
+?>
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Application Logs | Admin Panel -
-        <?php print($APP_CONFIG['APP_NAME']); ?>
-    </title>
-
+    <title>Application Logs | Admin Panel - <?php echo htmlspecialchars($APP_CONFIG['APP_NAME'] ?? 'App'); ?></title>
 </head>
-
-<body>
-    <pre><?php print($apps_logs); ?></pre>
+<body style="background:#0f172a; color:#f8fafc; padding:20px;">
+    <h3>Application Logs</h3>
+    <hr>
+    <pre><?php echo htmlspecialchars($apps_logs); ?></pre>
 </body>
-
 </html>
 <?php
-exit();
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -39,12 +47,11 @@ exit();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
-        <?php print($pageTitle); ?> |
-        <?php print($APP_CONFIG['APP_NAME']); ?>
+        <?php echo htmlspecialchars($pageTitle); ?> |
+        <?php echo htmlspecialchars($APP_CONFIG['APP_NAME'] ?? 'Live TV'); ?>
     </title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.11.0/sweetalert2.css" />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -58,7 +65,7 @@ exit();
             --text-muted: #94a3b8;
             --border-color: rgba(255,255,255,0.08);
             --secondary-bg: rgba(0,0,0,0.2);
-            --accent: #10b981; /* Success green */
+            --accent: #10b981;
         }
 
         body {
@@ -86,10 +93,9 @@ exit();
             z-index: 1000;
         }
         .container-main {
-            padding: 1.5rem 1rem 5rem; /* Space for fixed footer */
+            padding: 1.5rem 1rem 5rem;
         }
 
-        /* Full Width Layout */
         @media (min-width: 992px) {
             .container-main {
                 padding-left: 3.5rem;
@@ -97,7 +103,6 @@ exit();
             }
         }
 
-        /* Improved Header */
         header {
             background-color: rgba(15, 23, 42, 0.9);
             backdrop-filter: blur(16px);
@@ -108,11 +113,9 @@ exit();
             border-bottom: 1px solid var(--border-color);
             padding: 0.8rem 1rem;
         }
-        .header-content { display: flex; align-items: center; justify-content: space-between; }
         .logo-text { font-size: 1.4rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }
         .logo-text span { font-size: 1rem; color: var(--text-main); font-weight: 500; opacity: 0.7; }
 
-        /* Navigation Tabs */
         .nav-pills {
             background: var(--card-bg);
             padding: 0.4rem;
@@ -123,9 +126,9 @@ exit();
             max-width: 100%;
             overflow-x: auto;
             white-space: nowrap;
-            scrollbar-width: none; /* Firefox */
+            scrollbar-width: none;
         }
-        .nav-pills::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+        .nav-pills::-webkit-scrollbar { display: none; }
         .nav-pills .nav-link {
             color: var(--text-muted);
             border-radius: 0.75rem;
@@ -144,7 +147,6 @@ exit();
             color: var(--text-main);
         }
 
-        /* Compact Dashboard Cards */
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -156,17 +158,16 @@ exit();
         }
         .card:hover { border-color: rgba(59, 130, 246, 0.3); }
         .card-body { padding: 1.75rem; }
-        
+
         .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; }
-        
+
         @media (max-width: 576px) {
             .card-header-flex { flex-direction: column; align-items: flex-start; text-align: left; }
             .card-header-flex .btn { width: 100%; }
         }
 
         .card-title-ui { font-size: 1.15rem; font-weight: 700; color: var(--primary); margin: 0; }
-        
-        /* Modern Switches (Toggles) */
+
         .switch {
             position: relative;
             display: inline-block;
@@ -194,7 +195,6 @@ exit();
         input:checked + .slider { background-color: var(--accent); }
         input:checked + .slider:before { transform: translateX(24px); }
 
-        /* Dashboard Stats Utility */
         .stat-box {
             display: flex;
             align-items: center;
@@ -215,7 +215,6 @@ exit();
         .stat-info .label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
         .stat-info .value { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
 
-        /* Genre List Premium */
         .genre-list-container {
             max-height: 480px;
             overflow-y: auto;
@@ -239,7 +238,6 @@ exit();
         .genre-item input { margin-right: 12px; transform: scale(1.1); }
         .genre-item label { cursor: pointer; margin: 0; flex: 1; font-weight: 500; }
 
-        /* Form styling */
         .form-control {
             background-color: var(--secondary-bg);
             border: 1px solid var(--border-color);
@@ -257,7 +255,6 @@ exit();
         .text-muted { color: var(--text-muted) !important; }
         .form-control::placeholder { color: rgba(255,255,255,0.3) !important; opacity: 1; }
 
-        /* Sidebar/Tooltips Utility */
         .btn-icon {
             width: 36px; height: 36px;
             display: flex; align-items: center; justify-content: center;
@@ -266,7 +263,6 @@ exit();
         }
         .btn-icon:hover { transform: scale(1.05); }
 
-        /* Animation */
         .fade-in-up {
             animation: fadeInUp 0.4s ease-out forwards;
         }
@@ -275,7 +271,6 @@ exit();
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -288,7 +283,7 @@ exit();
         <div class="container-fluid d-flex align-items-center justify-content-between px-lg-4">
             <a href="admin.php" class="logo-text">
                 <i class="fa-solid fa-server"></i>
-                <?php print($APP_CONFIG['APP_NAME'] ?? 'Live TV'); ?> <span>| Admin</span>
+                <?php echo htmlspecialchars($APP_CONFIG['APP_NAME'] ?? 'Live TV'); ?> <span>| Admin</span>
             </a>
             <div class="d-flex align-items-center gap-3">
                  <a href="index.php" class="btn btn-outline-primary btn-sm rounded-pill" title="Go to Home">
@@ -300,10 +295,9 @@ exit();
             </div>
         </div>
     </header>
-    <main>
 
+    <main>
     <div class="container-main">
-        <!-- Dashboard Navigation Tabs -->
         <ul class="nav nav-pills" id="adminTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="portal-tab" data-bs-toggle="pill" data-bs-target="#portal-content" type="button" role="tab">
@@ -424,7 +418,7 @@ exit();
                                 <i class="fa-solid fa-check-double me-2"></i>Save Active Filter
                             </button>
                         </div>
-                        
+
                         <div class="row mt-4">
                             <div class="col-lg-4 col-md-5">
                                 <div class="genre-sidebar bg-black-20 p-3 rounded-4 h-100">
@@ -550,7 +544,7 @@ exit();
                         <h4 class="card-title-ui mb-4">Export Playlist</h4>
                         <div class="row g-4">
                             <div class="col-md-6 col-xl-4">
-                                <div class="bg-primary rounded-4 p-4 text-white hover-up shadow-lg">
+                                <div class="bg-primary rounded-4 p-4 text-white shadow-lg">
                                     <i class="fa-solid fa-file-export fa-3x mb-3 opacity-50"></i>
                                     <h5>Full M3U8 Playlist</h5>
                                     <p class="small opacity-75">Standard M3U format with full category support & icons.</p>
@@ -560,7 +554,7 @@ exit();
                                 </div>
                             </div>
                             <div class="col-md-6 col-xl-4">
-                                <div class="bg-info rounded-4 p-4 text-white hover-up shadow-lg">
+                                <div class="bg-info rounded-4 p-4 text-white shadow-lg">
                                     <i class="fa-solid fa-file-code fa-3x mb-3 opacity-50"></i>
                                     <h5>Browser Playlist</h5>
                                     <p class="small opacity-75">View the playlist links as a clean text file in browser.</p>
@@ -584,12 +578,11 @@ exit();
             </div>
         </div>
     </div>
-
     </main>
 
     <footer>
         <div class="container-fluid">
-            &copy; 2026 <?php print($APP_CONFIG['APP_NAME'] ?? 'Stalker Portal'); ?>
+            &copy; 2026 <?php echo htmlspecialchars($APP_CONFIG['APP_NAME'] ?? 'Stalker Portal'); ?>
         </div>
     </footer>
 
@@ -643,8 +636,6 @@ exit();
             });
         });
     </script>
-    <script src="assets/intriapp.js?token=<?php print(generateRandomAlphanumericString(32)); ?>"
-        onload="load_dashboard_data()"></script>
+    <script src="assets/intriapp.js?token=<?php echo generateRandomAlphanumericString(32); ?>" onload="if(typeof load_dashboard_data === 'function'){ load_dashboard_data(); }"></script>
 </body>
-
 </html>
