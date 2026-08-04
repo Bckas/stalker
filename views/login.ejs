@@ -19,6 +19,7 @@
         }
         .logo { font-size: 2rem; font-weight: 800; color: var(--primary); margin-bottom: 0.5rem; }
         .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
+        .login-error { color: #f87171; margin-bottom: 1rem; font-size: 0.9rem; font-weight: 600; }
         .form-group { margin-bottom: 1.5rem; text-align: left; }
         .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; }
         .input-wrapper { position: relative; }
@@ -43,12 +44,17 @@
     <div class="login-card">
         <div class="logo"><%= appName %></div>
         <div class="subtitle">Admin Control Panel</div>
-        <form id="loginForm">
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="login-error"><%= error %></div>
+        <% } %>
+
+        <form id="loginForm" method="post" action="/login">
             <div class="form-group">
                 <label>Admin Access PIN</label>
                 <div class="input-wrapper">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="pin" placeholder="Enter 4-digit PIN" maxlength="4" required>
+                    <input type="password" id="pin" name="pin" placeholder="Enter 4-digit PIN" maxlength="4" required>
                 </div>
             </div>
             <button type="submit" id="loginBtn">
@@ -76,7 +82,10 @@
                         Swal.fire({
                             icon: 'success', title: 'Access Granted', text: 'Redirecting to Admin Panel...',
                             timer: 1500, showConfirmButton: false, background: '#1e293b', color: '#f8fafc'
-                        }).then(() => { window.location.href = '/admin'; });
+                        }).then(() => {
+                            const tok = response.data || '';
+                            window.location.href = '/admin' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+                        });
                     } else {
                         btn.prop('disabled', false).html('<span>Login Securely</span> <i class="fas fa-arrow-right"></i>');
                         Swal.fire({ icon: 'error', title: 'Login Failed', text: response.message, background: '#1e293b', color: '#f8fafc' });
