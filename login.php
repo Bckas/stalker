@@ -2,7 +2,7 @@
 session_start();
 include("_inc.configs.php");
 
-// If already logged in, go to admin
+// If already logged in, go to admin page
 if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
     header("Location: admin.php");
     exit();
@@ -13,7 +13,7 @@ if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | <?php echo $APP_CONFIG['APP_NAME']; ?> Admin</title>
+    <title>Login | <?php echo isset($APP_CONFIG['APP_NAME']) ? $APP_CONFIG['APP_NAME'] : 'Stalker Portal'; ?> Admin</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.11.0/sweetalert2.css" />
@@ -106,28 +106,6 @@ if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
             background: rgba(255,255,255,0.1);
         }
 
-        .captcha-box {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .captcha-img-wrapper {
-            background: #fff;
-            border-radius: 0.75rem;
-            overflow: hidden;
-            height: 48px;
-            flex: 1;
-        }
-
-        .captcha-img-wrapper img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            cursor: pointer;
-        }
-
         button {
             width: 100%;
             background: var(--primary);
@@ -159,7 +137,7 @@ if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
 <body>
 
     <div class="login-card">
-        <div class="logo"><?php echo $APP_CONFIG['APP_NAME']; ?></div>
+        <div class="logo"><?php echo isset($APP_CONFIG['APP_NAME']) ? $APP_CONFIG['APP_NAME'] : 'Stalker Portal'; ?></div>
         <div class="subtitle">Admin Control Panel</div>
 
         <form id="loginForm">
@@ -167,7 +145,7 @@ if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
                 <label>Admin Access PIN</label>
                 <div class="input-wrapper">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="pin" placeholder="Enter 4-digit PIN" maxlength="4" required>
+                    <input type="password" id="pin" placeholder="Enter 4-digit PIN" maxlength="4" required autocomplete="off">
                 </div>
             </div>
 
@@ -184,49 +162,60 @@ if(isset($_SESSION['yuvisession']) && $_SESSION['yuvisession'] === true) {
     <script>
         $('#loginForm').on('submit', function(e) {
             e.preventDefault();
-            
+
             const pin = $('#pin').val();
             const btn = $('#loginBtn');
-            
+
             btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Verifying...');
 
             $.ajax({
                 url: 'api.php',
                 type: 'POST',
+                dataType: 'json',
                 data: {
                     action: 'login',
                     pin: pin
                 },
                 success: function(response) {
-                    if (response.status === 'success') {
+                    if (typeof response === 'string') {
+                        try {
+                            response = JSON.parse(response);
+                        } catch (err) {
+                            console.error('JSON parse error:', err);
+                        }
+                    }
+
+                    if (response && (response.status === 'success' || response.success === true)) {
                         Swal.fire({
                             icon: 'success',
                             title: 'Access Granted',
                             text: 'Redirecting to Admin Panel...',
-                            timer: 1500,
+                            timer: 1000,
                             showConfirmButton: false,
                             background: '#1e293b',
                             color: '#f8fafc'
-                        }).then(() => {
-                            window.location.href = 'admin.php';
+                        }).then(function() {
+                            // Hard redirect to admin.php
+                            window.location.replace('admin.php');
                         });
                     } else {
                         btn.prop('disabled', false).html('<span>Login Securely</span> <i class="fas fa-arrow-right"></i>');
                         Swal.fire({
                             icon: 'error',
                             title: 'Login Failed',
-                            text: response.message,
+                            text: (response && response.message) ? response.message : 'Invalid PIN entered.',
                             background: '#1e293b',
                             color: '#f8fafc'
                         });
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    console.error("Server Response:", xhr.responseText);
                     btn.prop('disabled', false).html('<span>Login Securely</span> <i class="fas fa-arrow-right"></i>');
                     Swal.fire({
                         icon: 'error',
                         title: 'Server Error',
-                        text: 'Unable to process login request.',
+                        text: 'Unable to process request. Please check api.php backend response.',
                         background: '#1e293b',
                         color: '#f8fafc'
                     });
