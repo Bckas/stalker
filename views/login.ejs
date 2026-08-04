@@ -6,7 +6,6 @@
     <title>Login | <%= appName %> Admin</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.11.0/sweetalert2.css" />
     <style>
         :root { --bg-color: #0f172a; --card-bg: #1e293b; --primary: #3b82f6; --text-main: #f8fafc; --text-muted: #94a3b8; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
@@ -37,7 +36,6 @@
             transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px;
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4); filter: brightness(1.1); }
-        button:disabled { opacity: 0.7; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -49,54 +47,19 @@
             <div class="login-error"><%= error %></div>
         <% } %>
 
-        <form id="loginForm" method="post" action="/login">
+        <form method="post" action="/login">
             <div class="form-group">
                 <label>Admin Access PIN</label>
                 <div class="input-wrapper">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="pin" name="pin" placeholder="Enter 4-digit PIN" maxlength="4" required>
+                    <input type="password" name="pin" placeholder="Enter 4-digit PIN" maxlength="4" required>
                 </div>
             </div>
-            <button type="submit" id="loginBtn">
+            <button type="submit">
                 <span>Login Securely</span>
                 <i class="fas fa-arrow-right"></i>
             </button>
         </form>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.11.0/sweetalert2.all.js"></script>
-    <script>
-        $('#loginForm').on('submit', function(e) {
-            e.preventDefault();
-            const pin = $('#pin').val();
-            const btn = $('#loginBtn');
-            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Verifying...');
-
-            $.ajax({
-                url: '/api',
-                type: 'POST',
-                data: { action: 'login', pin: pin },
-                success: function(response) {
-                    if (response.status === 'success') {
-                        Swal.fire({
-                            icon: 'success', title: 'Access Granted', text: 'Redirecting to Admin Panel...',
-                            timer: 1500, showConfirmButton: false, background: '#1e293b', color: '#f8fafc'
-                        }).then(() => {
-                            const tok = response.data || '';
-                            window.location.href = '/admin' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-                        });
-                    } else {
-                        btn.prop('disabled', false).html('<span>Login Securely</span> <i class="fas fa-arrow-right"></i>');
-                        Swal.fire({ icon: 'error', title: 'Login Failed', text: response.message, background: '#1e293b', color: '#f8fafc' });
-                    }
-                },
-                error: function() {
-                    btn.prop('disabled', false).html('<span>Login Securely</span> <i class="fas fa-arrow-right"></i>');
-                    Swal.fire({ icon: 'error', title: 'Server Error', text: 'Unable to process login request.', background: '#1e293b', color: '#f8fafc' });
-                }
-            });
-        });
-    </script>
 </body>
 </html>
