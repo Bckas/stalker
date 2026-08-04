@@ -1,0 +1,20 @@
+{
+  "name": "vercel-express-app",
+  "version": "1.0.0",
+  "description": "Complete Vercel Express Deployment Setup",
+  "main": "setup.js",
+  "scripts": {
+    "start": "node setup.js",
+    "dev": "nodemon setup.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
