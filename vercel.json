@@ -1,27 +1,14 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "*.php",
-      "use": "vercel-php"
-    }
-  ],
+  "functions": {
+    "api/**/*.php": { "runtime": "vercel-php@0.7.3" },
+    "*.php": { "runtime": "vercel-php@0.7.3" }
+  },
   "routes": [
-    {
-      "src": "/playlist.m3u",
-      "dest": "/playlist.php"
-    },
-    {
-      "src": "/live.(m3u8|ts|key)",
-      "dest": "/live.php"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/playlist.m3u", "dest": "/playlist.php" },
+    { "src": "/live.(m3u8|ts|key)", "dest": "/live.php" },
+    { "src": "/api/(.*)", "dest": "/api.php?action=$1" },
+    { "src": "/(.*)", "dest": "/index.php" }
   ]
 }
