@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "*.php",
+      "use": "vercel-php"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/playlist.m3u",
+      "dest": "/playlist.php"
+    },
+    {
+      "src": "/live.(m3u8|ts|key)",
+      "dest": "/live.php"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
