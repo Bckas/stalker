@@ -12,9 +12,9 @@ const {
 } = require('../lib/settings');
 const {
   macServerurl, macGetGenres, macGetallChannels, macGetProfile, macForceUpdateChannels,
-  getChannels, getChannelDetail, macFetchChannelsFromPortal, readCachedGenres,
+  getChannels, getChannelDetail, macFetchChannelsFromPortal, readCachedGenres, fixlogoissue,
 } = require('../lib/stalker');
-const { isAuthed, sessionCookie, clearCookie } = require('../lib/auth');
+const { isAuthed, sessionCookie, clearCookie, createSessionToken } = require('../lib/auth');
 const { buildFlatM3U, buildApiCategorizedM3U, buildCategorizedM3U } = require('../lib/m3u');
 const { handleLive } = require('../lib/live');
 
@@ -36,7 +36,10 @@ async function handleApi(req, res) {
   const get = (k) => (b[k] !== undefined && b[k] !== null ? b[k] : q[k]);
   const action = String(get('action') || '').trim();
 
-  const publicActions = ['getChannels', 'get_iptvplaylist', 'get_iptvplaylist_categorized', 'get_genres', 'get_categories', 'login', 'logout', 'getPlaybackDetails'];
+  const publicActions = [
+    'getChannels', 'get_iptvplaylist', 'get_iptvplaylist_categorized',
+    'get_genres', 'get_categories', 'login', 'logout', 'getPlaybackDetails',
+  ];
   if (!publicActions.includes(action) && !isAuthed(req)) {
     response(res, 'error', 401, 'Unauthorized Access. Please login.', '');
     return;
@@ -58,7 +61,6 @@ async function handleApi(req, res) {
             if (genres[genre_id]) category_title = genres[genre_id];
           }
           if (genre_filter && genre_filter.length && !genre_filter.includes(genre_id)) continue;
-          const { fixlogoissue } = require('../lib/stalker');
           live.push({
             id: etv.id,
             title: etv.title,
@@ -100,7 +102,10 @@ async function handleApi(req, res) {
       case 'get_genres': {
         if (!(await macServerurl())) { response(res, 'error', 503, 'Application is not Configured', ''); break; }
         const genres = await macGetGenres();
-        response(res, 'success', 200, `${Object.keys(genres).length} Genres Found`, { count: Object.keys(genres).length, list: genres });
+        response(res, 'success', 200, `${Object.keys(genres).length} Genres Found`, {
+          count: Object.keys(genres).length,
+          list: genres,
+        });
         break;
       }
 
@@ -108,7 +113,10 @@ async function handleApi(req, res) {
         if (!(await macServerurl())) { response(res, 'error', 503, 'Application is not Configured', ''); break; }
         const genres = await macGetGenres();
         const categories = Object.keys(genres).map((id) => ({ id, title: genres[id] }));
-        response(res, 'success', 200, `${categories.length} Categories Found`, { count: categories.length, list: categories });
+        response(res, 'success', 200, `${categories.length} Categories Found`, {
+          count: categories.length,
+          list: categories,
+        });
         break;
       }
 
@@ -129,7 +137,7 @@ async function handleApi(req, res) {
         if (!pin) { response(res, 'error', 400, 'Please Enter Access PIN To Login', ''); break; }
         const irlPIN = await appAccesspin('get', '');
         if (md5(pin) === md5(irlPIN)) {
-          res.setHeader('Set-Cookie', sessionCookie(require('../lib/auth').createSessionToken()));
+          res.setHeader('Set-Cookie', sessionCookie(createSessionToken()));
           response(res, 'success', 200, 'Logged In Successfully', '');
         } else {
           response(res, 'error', 403, 'Invalid Credentials', '');
@@ -294,4 +302,143 @@ async function handleApi(req, res) {
     }
   } catch (e) {
     console.error('[api]', e);
-    if (e && (e
+    if (e && (e.status || e.code)) { res.status(e.status || e.code).end(); return; }
+    response(res, 'error', 500, 'Internal Server Error', '');
+  }
+}
+
+// ================================================================
+// Pages (PHP pages ka port)
+// ================================================================
+
+// GET / — Homepage (index.php)
+app.get('/', async (req, res) => {
+  try {
+    const mac = await appMacportaldetail('get');
+    if (!mac.server_url) { res.redirect('/admin'); return; }
+    const channels = await macGetallChannels();
+    if (!channels || !channels.length) { res.redirect('/admin'); return; }
+    const allGenres = await readCachedGenres();
+    const genre_filter = await appGenreFilter('get');
+    let genres = allGenres;
+    if (genre_filter && genre_filter.length) {
+      const filtered = {};
+      for (const gid in allGenres) {
+        if (genre_filter.includes(gid)) filtered[gid] = allGenres[gid];
+      }
+      genres = filtered;
+    }
+    await appRecordalogs('VISIT', 'Homepage loaded - Channel list displayed');
+    res.render('index', {
+      appName: APP_CONFIG.APP_NAME,
+      genres,
+      adminButton: await appAdminButton('get'),
+    });
+  } catch (e) {
+    res.redirect('/admin');
+  }
+});
+
+// GET /login — login.php
+app.get('/login', (req, res) => {
+  if (isAuthed(req)) { res.redirect('/admin'); return; }
+  res.render('login', { appName: APP_CONFIG.APP_NAME });
+});
+
+// GET /admin — admin.php (auth required)
+app.get('/admin', (req, res) => {
+  if (!isAuthed(req)) { res.redirect('/login'); return; }
+  res.render('admin', { appName: APP_CONFIG.APP_NAME });
+});
+
+// GET /admin/logs — admin.php?module=application_logs
+app.get('/admin/logs', async (req, res) => {
+  if (!isAuthed(req)) { res.redirect('/login'); return; }
+  const logs = await store.readLog('axLogs');
+  res.render('logs', { appName: APP_CONFIG.APP_NAME, logs });
+});
+
+// GET /player?id=X — player.php
+app.get('/player', async (req, res) => {
+  try {
+    const id = String(req.query.id || '').trim();
+    if (!id) { res.redirect('/'); return; }
+    const clive = await getChannelDetail(id);
+    if (!clive || !clive.id) { res.redirect('/'); return; }
+    await appRecordalogs('PLAYBACK', `User started playing: ${clive.title} (ID: ${clive.id})`);
+    res.render('player', {
+      appName: APP_CONFIG.APP_NAME,
+      title: clive.title,
+      playbackUrl: `/live?id=${clive.id}`,
+    });
+  } catch (e) {
+    res.redirect('/');
+  }
+});
+
+// GET /live... — live.php (proxy)
+app.all(['/live', '/live.php', '/live.m3u8', '/live.ts', '/live.key'], handleLive);
+
+// GET /playlist.m3u — playlist.php
+app.get(['/playlist.m3u', '/playlist', '/playlist.php'], async (req, res) => {
+  try {
+    const data = await buildCategorizedM3U(req);
+    if (data === null) { res.status(503).send('No channels found.'); return; }
+    const mac = await appMacportaldetail('get');
+    const server_url = (mac && mac.server_url) || '';
+    let host = cleanString(APP_CONFIG.APP_NAME);
+    if (server_url) {
+      try { host = new URL(server_url).hostname; } catch {}
+    }
+    const file = `${host}.m3u`;
+    if (req.query.view === 'browser') {
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `inline; filename="${file}"`);
+    } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${file}"`);
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    }
+    res.send(data);
+  } catch (e) {
+    res.status(503).send('No channels found.');
+  }
+});
+
+// POST/GET /api — api.php
+app.all(['/api', '/api.php'], handleApi);
+
+// GET /check_data — debug
+app.get('/check_data', async (req, res) => {
+  const channelsRaw = await store.get('axCTV');
+  const genresRaw = await store.get('axGenres');
+  let channels = [];
+  let genres = {};
+  try { channels = JSON.parse(channelsRaw) || []; } catch {}
+  try { genres = JSON.parse(genresRaw) || {}; } catch {}
+  let sample = null;
+  try {
+    const adata = await macFetchChannelsFromPortal();
+    if (adata && adata.js && adata.js.data && adata.js.data.length) sample = adata.js.data[0];
+    else sample = adata;
+  } catch {}
+  res.render('check_data', {
+    channels,
+    genres,
+    sample,
+    serverUrl: await macServerurl(),
+  });
+});
+
+// Legacy .php redirects (local dev ke liye; Vercel par rewrites already handle karte hain)
+app.get('/index.php', (req, res) => res.redirect('/'));
+app.get('/admin.php', (req, res) => res.redirect('/admin'));
+app.get('/login.php', (req, res) => res.redirect('/login'));
+app.get('/player.php', (req, res) => res.redirect('/player?' + new URLSearchParams(req.query).toString()));
+app.get('/playlist.php', (req, res) => res.redirect('/playlist.m3u' + (req.query.view === 'browser' ? '?view=browser' : '')));
+
+// 404
+app.use((req, res) => {
+  res.status(404).send('Not Found');
+});
+
+module.exports = app;
